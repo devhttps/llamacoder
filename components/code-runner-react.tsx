@@ -8,15 +8,19 @@ import {
 } from "@codesandbox/sandpack-react/unstyled";
 import dedent from "dedent";
 import { CheckIcon, CopyIcon } from "lucide-react";
-import { useState } from "react";
+import { memo, useCallback, useState } from "react";
 
-export default function ReactCodeRunner({
+export default memo(function ReactCodeRunner({
   code,
   onRequestFix,
 }: {
   code: string;
   onRequestFix?: (e: string) => void;
 }) {
+  const handleErrorFix = useCallback((error: string) => {
+    onRequestFix?.(error);
+  }, [onRequestFix]);
+
   return (
     <SandpackProvider
       key={code}
@@ -61,14 +65,27 @@ export default function ReactCodeRunner({
         showOpenNewtab={false}
         className="h-full w-full"
       />
-      {onRequestFix && <ErrorMessage onRequestFix={onRequestFix} />}
+      {onRequestFix && <ErrorMessage onRequestFix={handleErrorFix} />}
     </SandpackProvider>
   );
 }
 
-function ErrorMessage({ onRequestFix }: { onRequestFix: (e: string) => void }) {
+const ErrorMessage = memo(function ErrorMessage({ onRequestFix }: { onRequestFix: (e: string) => void }) {
   const { sandpack } = useSandpack();
   const [didCopy, setDidCopy] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    if (!sandpack.error) return;
+    setDidCopy(true);
+    await window.navigator.clipboard.writeText(sandpack.error.message);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    setDidCopy(false);
+  }, [sandpack.error]);
+
+  const handleFix = useCallback(() => {
+    if (!sandpack.error) return;
+    onRequestFix(sandpack.error.message);
+  }, [onRequestFix, sandpack.error]);
 
   if (!sandpack.error) return null;
 
@@ -83,25 +100,13 @@ function ErrorMessage({ onRequestFix }: { onRequestFix: (e: string) => void }) {
 
         <div className="mt-8 flex justify-between gap-4">
           <button
-            onClick={async () => {
-              if (!sandpack.error) return;
-
-              setDidCopy(true);
-              await window.navigator.clipboard.writeText(
-                sandpack.error.message,
-              );
-              await new Promise((resolve) => setTimeout(resolve, 2000));
-              setDidCopy(false);
-            }}
+            onClick={handleCopy}
             className="rounded border-red-300 px-2.5 py-1.5 text-sm font-semibold text-red-50"
           >
             {didCopy ? <CheckIcon size={18} /> : <CopyIcon size={18} />}
           </button>
           <button
-            onClick={() => {
-              if (!sandpack.error) return;
-              onRequestFix(sandpack.error.message);
-            }}
+            onClick={handleFix}
             className="rounded bg-white px-2.5 py-1.5 text-sm font-medium text-black"
           >
             Try to fix
@@ -110,7 +115,7 @@ function ErrorMessage({ onRequestFix }: { onRequestFix: (e: string) => void }) {
       </div>
     </div>
   );
-}
+});
 
 const shadcnFiles = {
   "/lib/utils.ts": shadcnComponents.utils,

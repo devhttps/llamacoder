@@ -1,24 +1,31 @@
 import { animate, ValueAnimationTransition } from "framer-motion";
-import { useRef } from "react";
+import { useCallback, useRef } from "react";
+
+interface ScrollOptions extends ValueAnimationTransition {
+  offset?: number;
+}
 
 export function useScrollTo() {
-  let ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
 
-  function scrollTo(options: ValueAnimationTransition = {}) {
+  const scrollTo = useCallback((options: ScrollOptions = {}) => {
     if (!ref.current) return;
 
-    let defaultOptions: ValueAnimationTransition = {
+    const { offset = 0, ...animationOptions } = options;
+    const defaultOptions: ValueAnimationTransition = {
       type: "spring",
       bounce: 0,
       duration: 0.6,
     };
 
-    animate(window.scrollY, ref.current.offsetTop, {
+    const targetPosition = ref.current.offsetTop - offset;
+
+    animate(window.scrollY, targetPosition, {
       ...defaultOptions,
-      ...options,
+      ...animationOptions,
       onUpdate: (latest) => window.scrollTo({ top: latest }),
     });
-  }
+  }, []);
 
   return [ref, scrollTo] as const;
 }
